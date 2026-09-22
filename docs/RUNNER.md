@@ -298,6 +298,7 @@ request_timeout_secs = 30
 id = "github"
 name = "GitHub"
 executable = "/absolute/path/to/github-mcp-server"
+protocol_version = "2025-06-18"
 args = []
 cwd = "/absolute/provider/workdir"
 env_from_env = { GITHUB_TOKEN = "GITHUB_TOKEN", PATH = "PATH", HOME = "HOME" }
@@ -305,6 +306,8 @@ timeout_secs = 30
 ```
 
 `executable` and optional `cwd` must be absolute host-local operator configuration. Invalid paths fail closed. `[mcp]` participates in the normal generation-fenced Runner config reload transaction: unchanged providers keep their exact provider identity and live connection, changed providers receive a fresh provider identity, and added/removed providers update routing without restarting the Runner. Old exact provider identities fail closed and are never retargeted.
+
+`protocol_version` is optional and defaults to `2025-06-18`. Providers that implement the earlier MCP `2025-03-26` tool protocol can opt into that version per provider. Other values are rejected; the Runner does not silently negotiate or downgrade the configured version.
 
 Provider processes do not inherit the Runner environment wholesale. `env_from_env` copies only explicitly named variables, and WebCodex's own sensitive transport/account credential variables cannot be mapped. A missing configured source variable fails before provider start. On Windows, the Runner additionally supplies only the non-secret `SYSTEMROOT` OS bootstrap after clearing the environment, unless that destination is explicitly mapped; `PATH`, user-profile state, proxies, and credentials are still not inherited.
 
@@ -316,7 +319,7 @@ A provider connection starts on first real interaction and is reused while healt
 
 The built-in Runner-to-provider gateway is intentionally a bounded stdio tool subset, not a transparent bridge to every MCP feature:
 
-- provider-side tool behavior is based on MCP `2025-06-18`;
+- provider-side tool behavior defaults to MCP `2025-06-18`; configured providers may instead use the supported compatibility version `2025-03-26`;
 - `tools/list` and `tools/call` are supported;
 - callbacks, list pagination, and end-to-end progress forwarding are not supported;
 - tool results support text plus standard bounded image content blocks, preserving provider content order; image data must be standard Base64 with MIME `image/png`, `image/jpeg`, or `image/webp`, and all image blocks in one result share a 1 MiB decoded-data cap;

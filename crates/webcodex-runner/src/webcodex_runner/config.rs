@@ -181,6 +181,12 @@ impl Default for AcpConfig {
 use webcodex_core::mcp_gateway::MCP_GATEWAY_MAX_ENV_MAPPINGS;
 const MCP_GATEWAY_MAX_ENV_NAME_BYTES: usize = 256;
 pub(crate) const MCP_GATEWAY_MAX_CWD_BYTES: usize = 4_096;
+pub(crate) const MCP_GATEWAY_DEFAULT_PROTOCOL_VERSION: &str = "2025-06-18";
+const MCP_GATEWAY_COMPAT_PROTOCOL_VERSION: &str = "2025-03-26";
+const MCP_GATEWAY_SUPPORTED_PROTOCOL_VERSIONS: &[&str] = &[
+    MCP_GATEWAY_DEFAULT_PROTOCOL_VERSION,
+    MCP_GATEWAY_COMPAT_PROTOCOL_VERSION,
+];
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub(crate) struct McpGatewayConfig {
@@ -195,6 +201,9 @@ pub(crate) struct McpGatewayProviderConfig {
     pub(crate) id: String,
     pub(crate) name: String,
     pub(crate) executable: String,
+    /// MCP protocol version advertised to and required from this provider.
+    #[serde(default = "default_mcp_gateway_protocol_version")]
+    pub(crate) protocol_version: String,
     #[serde(default)]
     pub(crate) args: Vec<String>,
     /// Optional host-local working directory used exactly as `Command::current_dir`.
@@ -214,6 +223,10 @@ pub(crate) struct McpGatewayProviderConfig {
 
 fn default_mcp_gateway_request_timeout_secs() -> u64 {
     30
+}
+
+fn default_mcp_gateway_protocol_version() -> String {
+    MCP_GATEWAY_DEFAULT_PROTOCOL_VERSION.to_string()
 }
 
 impl Default for McpGatewayConfig {
@@ -1922,6 +1935,12 @@ fn validate_mcp_gateway_config(config: &McpGatewayConfig) -> Result<(), String> 
             .map_err(|error| format!("mcp provider id is invalid: {error}"))?;
         validate_provider_name(&provider.name)
             .map_err(|error| format!("mcp provider name is invalid: {error}"))?;
+        if !MCP_GATEWAY_SUPPORTED_PROTOCOL_VERSIONS.contains(&provider.protocol_version.as_str()) {
+            return Err(format!(
+                "mcp provider '{}' protocol_version must be one of '2025-06-18' or '2025-03-26'",
+                provider.id
+            ));
+        }
         if provider
             .timeout_secs
             .is_some_and(|timeout| !(1..=120).contains(&timeout))
@@ -2185,6 +2204,7 @@ mod mcp_gateway_config_tests {
                 .unwrap()
                 .to_string_lossy()
                 .into_owned(),
+            protocol_version: MCP_GATEWAY_DEFAULT_PROTOCOL_VERSION.to_string(),
             args: Vec::new(),
             cwd: None,
             env_from_env: BTreeMap::new(),

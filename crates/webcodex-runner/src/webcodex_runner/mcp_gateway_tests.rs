@@ -85,6 +85,7 @@ impl Fixture {
             scenario,
             default_timeout_secs,
             provider_timeout_secs,
+            MCP_GATEWAY_DEFAULT_PROTOCOL_VERSION,
             None,
             BTreeMap::new(),
         )
@@ -94,6 +95,7 @@ impl Fixture {
         scenario: &str,
         default_timeout_secs: u64,
         provider_timeout_secs: Option<u64>,
+        protocol_version: &str,
         cwd: Option<String>,
         env_from_env: BTreeMap<String, String>,
     ) -> Self {
@@ -110,6 +112,7 @@ impl Fixture {
                 id: "fake".to_string(),
                 name: "Fake provider".to_string(),
                 executable: fake.path.to_string_lossy().to_string(),
+                protocol_version: protocol_version.to_string(),
                 args,
                 cwd,
                 env_from_env,
@@ -180,6 +183,24 @@ fn provider_state(response: McpGatewayResponse) -> McpGatewayProviderState {
 }
 
 #[test]
+fn configured_compat_protocol_version_is_used_for_initialize() {
+    let fixture = Fixture::with_execution_context(
+        "normal",
+        TEST_PARALLEL_TIMEOUT_FLOOR_SECS,
+        None,
+        "2025-03-26",
+        None,
+        BTreeMap::new(),
+    );
+    let provider = fixture.provider();
+
+    let response = fixture.list(&provider);
+    assert!(response.error.is_none(), "{:?}", response.error);
+    assert_eq!(fixture.marker_count("initialize"), 1);
+    assert_eq!(fixture.marker_count("list"), 1);
+}
+
+#[test]
 fn provider_status_is_passive_and_tracks_connection_lifecycle() {
     let fixture = Fixture::new("crash", 2);
     let provider = fixture.provider();
@@ -246,6 +267,7 @@ fn replacement_config(
             id: id.to_string(),
             name: name.to_string(),
             executable: fixture._fake.path.to_string_lossy().into_owned(),
+            protocol_version: MCP_GATEWAY_DEFAULT_PROTOCOL_VERSION.to_string(),
             args: vec![
                 scenario.to_string(),
                 fixture.marker.to_string_lossy().into_owned(),
@@ -603,6 +625,7 @@ fn provider_execution_context_is_explicit_cleared_and_private() {
         "execution_context",
         TEST_PARALLEL_TIMEOUT_FLOOR_SECS,
         None,
+        MCP_GATEWAY_DEFAULT_PROTOCOL_VERSION,
         Some(cwd.path().to_string_lossy().into_owned()),
         BTreeMap::from([
             ("GITHUB_TOKEN".to_string(), "GITHUB_TOKEN".to_string()),
@@ -648,6 +671,7 @@ fn missing_mapped_source_fails_before_provider_spawn() {
         "normal",
         2,
         None,
+        MCP_GATEWAY_DEFAULT_PROTOCOL_VERSION,
         None,
         BTreeMap::from([(
             "PROVIDER_CREDENTIAL".to_string(),
@@ -669,6 +693,7 @@ fn sensitive_runner_env_mapping_is_blocked_before_provider_spawn() {
         "normal",
         2,
         None,
+        MCP_GATEWAY_DEFAULT_PROTOCOL_VERSION,
         None,
         BTreeMap::from([(
             "PROVIDER_CREDENTIAL".to_string(),
@@ -695,6 +720,7 @@ fn unavailable_provider_cwd_fails_before_provider_spawn() {
         "normal",
         2,
         None,
+        MCP_GATEWAY_DEFAULT_PROTOCOL_VERSION,
         Some(missing.to_string_lossy().into_owned()),
         BTreeMap::new(),
     );

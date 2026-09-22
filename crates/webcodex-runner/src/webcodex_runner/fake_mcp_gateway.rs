@@ -87,6 +87,8 @@ fn main() -> io::Result<()> {
                 if scenario == "init_timeout" {
                     thread::sleep(Duration::from_secs(6));
                 }
+                let protocol_version = string_field(&line, "protocolVersion")
+                    .unwrap_or_else(|| "2025-06-18".to_string());
                 let capabilities = if scenario == "init_missing_tools" {
                     r#"{}"#
                 } else {
@@ -95,7 +97,7 @@ fn main() -> io::Result<()> {
                 send(
                     &mut writer,
                     &format!(
-                        r#"{{"jsonrpc":"2.0","id":{id},"result":{{"protocolVersion":"2025-06-18","capabilities":{capabilities},"serverInfo":{{"name":"fake-bridge","version":"1"}}}}}}"#
+                        r#"{{"jsonrpc":"2.0","id":{id},"result":{{"protocolVersion":"{protocol_version}","capabilities":{capabilities},"serverInfo":{{"name":"fake-bridge","version":"1"}}}}}}"#
                     ),
                 )?;
             }

@@ -262,6 +262,7 @@ request_timeout_secs = 30
 id = "github"
 name = "GitHub"
 executable = "/absolute/path/to/github-mcp-server"
+protocol_version = "2025-06-18"
 args = []
 cwd = "/absolute/provider/workdir"
 env_from_env = { GITHUB_TOKEN = "GITHUB_TOKEN", PATH = "PATH", HOME = "HOME" }
@@ -269,6 +270,8 @@ timeout_secs = 30
 ```
 
 `executable` 与可选 `cwd` 都是 Runner host-local operator 配置并且必须为绝对路径；非法路径会 fail closed。`[mcp]` 现在参与正常的 generation-fenced Runner config reload transaction：配置未变化的 provider 保留 exact provider identity 和现有 connection；配置发生变化的 provider 获得新的 provider identity；新增/删除 provider 会在不重启 Runner 的情况下更新 routing。旧的 exact provider identity 会 fail closed，绝不会被静默 retarget。
+
+`protocol_version` 可省略，默认是 `2025-06-18`。如果 provider 实现的是较早的 MCP `2025-03-26` tool protocol，可以按 provider 显式选择该版本。其他值会被拒绝；Runner 不会对配置版本做静默协商或自动降级。
 
 provider 不会整体继承 Runner 环境。`env_from_env` 只复制显式列出的变量，WebCodex 自己的 sensitive transport/account credential 变量不允许映射；配置的 source variable 缺失时会在 provider 启动前失败。Windows 上，Runner 在清空环境后会额外只提供非敏感的 `SYSTEMROOT` OS bootstrap（除非 operator 显式映射该 destination）；`PATH`、用户 profile 状态、代理与 credential 仍不会被整体继承。
 
@@ -280,7 +283,7 @@ provider connection 在第一次真实交互时启动，并在健康时复用。
 
 Runner 到 configured local provider 的内建 gateway 有意限制为 bounded stdio tool subset，并不是所有 MCP feature 的透明 bridge：
 
-- provider-side tool 行为基于 MCP `2025-06-18`；
+- provider-side tool 行为默认基于 MCP `2025-06-18`；configured provider 也可以显式使用受支持的兼容版本 `2025-03-26`；
 - 支持 `tools/list` 与 `tools/call`；
 - 不支持 callback、list pagination 与端到端 progress forwarding；
 - tool result 支持 text 以及标准的有界 image content block，并保持 provider `content` 原始顺序；image `data` 必须是 standard Base64，MIME 仅支持 `image/png`、`image/jpeg`、`image/webp`，单个 result 内全部 image block 合计 decoded data 上限为 1 MiB；

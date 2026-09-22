@@ -1127,6 +1127,7 @@ id = "local-tools"
 name = "Local tools"
 executable = {executable}
 args = ["--stdio", "$HOME", "$(id)"]
+protocol_version = "2025-03-26"
 cwd = {cwd}
 env_from_env = {{ GITHUB_TOKEN = "GITHUB_TOKEN", HOME = "HOME" }}
 timeout_secs = 5
@@ -1139,6 +1140,10 @@ timeout_secs = 5
     assert_eq!(config.mcp_gateway.request_timeout_secs, 7);
     assert_eq!(config.mcp_gateway.providers.len(), 1);
     assert_eq!(config.mcp_gateway.providers[0].timeout_secs, Some(5));
+    assert_eq!(
+        config.mcp_gateway.providers[0].protocol_version,
+        "2025-03-26"
+    );
     assert_eq!(
         config.mcp_gateway.providers[0].args,
         ["--stdio", "$HOME", "$(id)"]
@@ -1188,6 +1193,10 @@ executable = {executable}
     let config = load_config(&path).unwrap();
     assert_eq!(config.mcp_gateway.request_timeout_secs, 11);
     assert_eq!(config.mcp_gateway.providers[0].timeout_secs, None);
+    assert_eq!(
+        config.mcp_gateway.providers[0].protocol_version,
+        "2025-06-18"
+    );
 }
 
 #[test]
@@ -1215,6 +1224,18 @@ timeout_secs = 121
 "#
             ),
             "timeout_secs must be between 1 and 120",
+        ),
+        (
+            format!(
+                r#"
+[[mcp.providers]]
+id = "bad-protocol"
+name = "Bad protocol"
+executable = {executable}
+protocol_version = "2024-11-05"
+"#
+            ),
+            "protocol_version must be one of '2025-06-18' or '2025-03-26'",
         ),
         (
             format!(

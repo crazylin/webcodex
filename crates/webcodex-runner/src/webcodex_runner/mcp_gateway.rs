@@ -6,6 +6,8 @@
 //! replayed, while a later explicit request may establish a fresh connection
 //! under the same provider identity and revalidate tool schema before dispatch.
 
+#[cfg(test)]
+use super::config::MCP_GATEWAY_DEFAULT_PROTOCOL_VERSION;
 use super::config::{McpGatewayConfig, McpGatewayProviderConfig, MCP_GATEWAY_MAX_CWD_BYTES};
 #[cfg(windows)]
 use super::shell::env_keys_equal;
@@ -26,7 +28,6 @@ use std::sync::{mpsc, Arc, Mutex, RwLock, TryLockError};
 use std::time::{Duration, Instant};
 use webcodex_process::ManagedChild;
 
-const MCP_PROTOCOL_VERSION: &str = "2025-06-18";
 const MCP_GATEWAY_MAX_IGNORED_NOTIFICATIONS: usize = 32;
 const PROVIDER_NEVER_STARTED: u8 = 0;
 const PROVIDER_HEALTHY: u8 = 1;
@@ -659,7 +660,7 @@ impl ProviderConnection {
         let initialized = connection.request(
             "initialize",
             json!({
-                "protocolVersion": MCP_PROTOCOL_VERSION,
+                "protocolVersion": config.protocol_version.as_str(),
                 "capabilities": {},
                 "clientInfo": {
                     "name": "webcodex-runner-mcp-gateway",
@@ -668,7 +669,7 @@ impl ProviderConnection {
             }),
             timeout,
         )?;
-        validate_initialize_result(&initialized)?;
+        validate_initialize_result(&initialized, &config.protocol_version)?;
         connection.send_notification("notifications/initialized", json!({}))?;
         Ok(connection)
     }
@@ -1097,7 +1098,10 @@ fn validate_rpc_response(response: Value, expected_id: u64) -> Result<Value, Pro
     }
 }
 
-fn validate_initialize_result(result: &Value) -> Result<(), ProviderFailure> {
+fn validate_initialize_result(
+    result: &Value,
+    expected_protocol_version: &str,
+) -> Result<(), ProviderFailure> {
     validate_json_value(
         result,
         MCP_GATEWAY_MAX_MESSAGE_BYTES,
@@ -1116,7 +1120,7 @@ fn validate_initialize_result(result: &Value) -> Result<(), ProviderFailure> {
                 !value.is_empty() && value.len() <= 128 && !value.chars().any(char::is_control)
             })
     };
-    if object.get("protocolVersion").and_then(Value::as_str) != Some(MCP_PROTOCOL_VERSION)
+    if object.get("protocolVersion").and_then(Value::as_str) != Some(expected_protocol_version)
         || !object.get("capabilities").is_some_and(Value::is_object)
         || !object
             .get("capabilities")
