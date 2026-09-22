@@ -124,6 +124,20 @@ function Wait-Until([scriptblock]$Condition, [int]$Seconds, [string]$Failure) {
     throw $Failure
 }
 
+function Remove-FileWhenUnlocked([string]$Path, [int]$Seconds, [string]$Failure) {
+    $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
+    do {
+        if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return }
+        try {
+            Remove-Item -LiteralPath $Path -Force -ErrorAction Stop
+            return
+        } catch {
+            if ([DateTime]::UtcNow -ge $deadline) { throw $Failure }
+            Start-Sleep -Milliseconds 250
+        }
+    } while ($true)
+}
+
 if (Get-WebCodexUninstallEntry) {
     throw "refusing Desktop installer smoke because WebCodex Desktop is already installed for this user"
 }
@@ -228,7 +242,10 @@ try {
                     throw "Desktop installer-owned files remained after silent uninstall: $($remaining.Name -join ', ')"
                 }
                 if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
-                    Remove-Item -LiteralPath $uninstaller -Force
+                    # Windows ARM64 can briefly retain the NSIS image mapping after
+                    # the waited uninstall process exits. Retry only this final
+                    # deterministic cleanup within one bounded deadline.
+                    Remove-FileWhenUnlocked $uninstaller 30 "Desktop uninstaller remained locked after silent uninstall: $uninstaller"
                 }
                 Remove-Item -LiteralPath $installedDir -Force
             }
